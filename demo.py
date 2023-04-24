@@ -18,7 +18,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 preprocess =  Compose([Resize((224, 224), interpolation=BICUBIC), ToTensor(),
     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-pil_img = Image.open("2.jpg").convert("RGB")
+pil_img = Image.open("9.jpg").convert("RGB")
 # pil_img = preprocess(pil_img).unsqueeze(0).to(device)
 
 model, vis_processors, _ = load_model_and_preprocess(name="blip2_opt", model_type="pretrain_opt6.7b", is_eval=True, device=device)
@@ -50,8 +50,8 @@ image = preprocess(pil_img).unsqueeze(0).to(device)
 out_list = []
 blip_output_forsecond = blip_output_forsecond[0].split('-')[0]
 out_list.append(blip_output_forsecond)
-# out_list.append(blip_output2[0])
-# out_list = " ".join(out_list)
+out_list.append(blip_output2[0])
+out_list = " ".join(out_list)
 text_list = []
 text_list.append(out_list)
 text = text_list
@@ -284,12 +284,12 @@ with torch.no_grad():
     sm_mean = sm_norm.mean(-1, keepdim=True)
 
     # get positive points from individual maps, and negative points from the mean map
-    p, l = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.9)
+    p, l = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.95)
     num = len(p) // 2
     points = p[num:] # negatives in the second half
     labels = [l[num:]]
     for i in range(sm.shape[-1]):
-        p, l = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.9)
+        p, l = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.95)
         num = len(p) // 2
         points = points + p[:num] # positive in first half
         labels.append(l[:num])
@@ -312,4 +312,4 @@ with torch.no_grad():
     print('SAM & CLIP Surgery for texts combination:', text)
     plt.imshow(vis)
     plt.show()
-    plt.savefig("./2_sam.jpg")
+    plt.savefig("./9_sam.jpg")
