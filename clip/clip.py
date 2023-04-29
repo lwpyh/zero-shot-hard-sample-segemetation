@@ -334,10 +334,11 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=2):
     labels[num:] = 0
     points = []
     vis = (sm1.cpu().numpy() * 255).astype('uint8')
-    vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+    vis1 = sm1.cpu().numpy()
     th, imgx = cv2.threshold(vis, 0, 255, cv2.THRESH_OTSU)
     plt.imshow(imgx)
     plt.savefig("./map1.jpg")
+    vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
     vis = cv2_img * 0.4 + vis * 0.6
     vis = cv2.cvtColor(vis.astype('uint8'), cv2.COLOR_BGR2RGB)
     plt.imshow(vis)
@@ -354,4 +355,4 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=2):
         y = min((idx // w + 0.5) * scale_h, shape[0] - 1)
         points.append([int(x.item()), int(y.item())])
 
-    return points, labels
+    return points, labels, vis1

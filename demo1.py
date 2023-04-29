@@ -17,12 +17,12 @@ model.eval()
 preprocess = Compose([Resize((224, 224), interpolation=BICUBIC), ToTensor(),
                       Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-pil_img = Image.open("1.jpg")
+pil_img = Image.open("5.jpg")
 cv2_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 image = preprocess(pil_img).unsqueeze(0).to(device)
 all_texts = ['airplane', 'bag', 'bed', 'bedclothes', 'bench', 'bicycle', 'bird', 'boat', 'book', 'bottle', 'building', 'bus', 'cabinet', 'car', 'cat', 'ceiling', 'chair', 'cloth', 'computer', 'cow', 'cup', 'curtain', 'dog', 'door', 'fence', 'floor', 'flower', 'food', 'grass', 'ground', 'horse', 'keyboard', 'light', 'motorbike', 'mountain', 'mouse', 'person', 'plate', 'platform', 'potted plant', 'road', 'rock', 'sheep', 'shelves', 'sidewalk', 'sign', 'sky', 'snow', 'sofa', 'table', 'track', 'train', 'tree', 'truck', 'tv monitor', 'wall', 'water', 'window', 'wood']
-target_texts = ['crab']
-all_texts.append('crab')
+target_texts = ['fish in the middle']
+all_texts.append('fish in the middle')
 ### Explain CLIP via our CLIP Surgery
 model, preprocess = clip.load("CS-ViT-B/16", device=device)
 model.eval()
@@ -77,14 +77,12 @@ with torch.no_grad():
     sm_mean = sm_norm.mean(-1, keepdim=True)
 
     # get positive points from individual maps, and negative points from the mean map
-    p, l = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.8)
-    import pdb
-    pdb.set_trace()
+    p, l = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.9)
     num = len(p) // 2
     points = p[num:]  # negatives in the second half
     labels = [l[num:]]
     for i in range(sm.shape[-1]):
-        p, l = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2],cv2_img,  t=0.8)
+        p, l = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2],cv2_img,  t=0.9)
         num = len(p) // 2
         points = points + p[:num]  # positive in first half
         labels.append(l[:num])
@@ -103,5 +101,5 @@ with torch.no_grad():
     vis = cv2.cvtColor(vis.astype('uint8'), cv2.COLOR_BGR2RGB)
     print('SAM & CLIP Surgery for texts combination:', target_texts)
     plt.imshow(vis)
-    plt.savefig("./try.jpg")
+    plt.savefig("./5_sam.jpg")
 
