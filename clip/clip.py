@@ -6,7 +6,7 @@ from typing import Union, List
 from pkg_resources import packaging
 import cv2
 import torch
-from PIL import Image
+from PIL import Image,ImageDraw
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from tqdm import tqdm
 import numpy as np
@@ -309,7 +309,7 @@ def clip_feature_surgery(image_features, text_features, redundant_feats=None, t=
 
 
 # sm shape N_t
-def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=2):
+def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=1):
     side = int(sm.shape[0] ** 0.5)
     sm = sm.reshape(1, 1, side, side)
     sm1 = sm
@@ -323,26 +323,62 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=2):
     sm1 = sm1.reshape(-1)
     sm1 = (sm1 - sm1.min()) / (sm1.max() - sm1.min())
     sm1 = sm1.reshape(cv2_img.shape[0], cv2_img.shape[1])
-    # import pdb
-    # pdb.set_trace()
+    #import pdb
+    #pdb.set_trace()
     rank = sm.sort(0)[1]
     scale_h = float(shape[0]) / h
     scale_w = float(shape[1]) / w
-
+    #sm1 = sm.reshape(down_side, down_side)
     num = min((sm >= t).sum(), sm.shape[0] // 2)
     labels = np.ones(num * 2).astype('uint8')
     labels[num:] = 0
     points = []
     vis = (sm1.cpu().numpy() * 255).astype('uint8')
     vis1 = sm1.cpu().numpy()
+    vis2 = vis
+    vis2 = cv2.cvtColor(vis2, cv2.COLOR_GRAY2BGR)
+    vis2 = cv2.cvtColor(vis2.astype('uint8'), cv2.COLOR_BGR2RGB)
     th, imgx = cv2.threshold(vis, 0, 255, cv2.THRESH_OTSU)
     plt.imshow(imgx)
-    plt.savefig("./map1.jpg")
+    plt.imsave("./map1.jpg", vis2)
     vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
     vis = cv2_img * 0.4 + vis * 0.6
+    max_point = rank[-1]
+    new_x = min((max_point  % w + 0.5) * scale_w, shape[1] - 1)
+    new_y = min((max_point // w + 0.5) * scale_h, shape[0] - 1)
+    star = np.array([
+    [new_x, new_y - 20],
+    [new_x + 5, new_y - 5],
+    [new_x + 20, new_y - 5],
+    [new_x + 7, new_y + 5],
+    [new_x + 12, new_y + 20],
+    [new_x, new_y + 10],
+    [new_x - 12, new_y + 20],
+    [new_x - 7, new_y + 5],
+    [new_x - 20, new_y - 5],
+    [new_x - 5, new_y - 5]
+], np.int32)
+    min_point = rank[0]
+    new_x1 = min((min_point  % w + 0.5) * scale_w, shape[1] - 1)
+    new_y1 = min((min_point // w + 0.5) * scale_h, shape[0] - 1)
+    star1 = np.array([
+    [new_x1, new_y1 - 20],
+    [new_x1 + 5, new_y1 - 5],
+    [new_x1 + 20, new_y1 - 5],
+    [new_x1 + 7, new_y1 + 5],
+    [new_x1 + 12, new_y1 + 20],
+    [new_x1, new_y1 + 10],
+    [new_x1 - 12, new_y1 + 20],
+    [new_x1 - 7, new_y1 + 5],
+    [new_x1 - 20, new_y1 - 5],
+    [new_x1 - 5, new_y1 - 5]
+], np.int32)
+
     vis = cv2.cvtColor(vis.astype('uint8'), cv2.COLOR_BGR2RGB)
+    cv2.polylines(vis, [star], True, (0, 255, 255), 2)
+    cv2.polylines(vis, [star1], True, (255, 255, 255), 2)
     plt.imshow(vis)
-    plt.savefig("./map.jpg")
+    plt.imsave("./map.jpg", vis)
     # positives
     for idx in rank[-num:]:
         x = min((idx % w + 0.5) * scale_w, shape[1] - 1) # +0.5 to center

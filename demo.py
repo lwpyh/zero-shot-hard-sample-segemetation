@@ -18,7 +18,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 preprocess =  Compose([Resize((224, 224), interpolation=BICUBIC), ToTensor(),
     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-pil_img = Image.open("11_map.jpg").convert("RGB")
+pil_img = Image.open("11.jpg").convert("RGB")
 # pil_img = preprocess(pil_img).unsqueeze(0).to(device)
 
 model, vis_processors, _ = load_model_and_preprocess(name="blip2_opt", model_type="pretrain_opt6.7b", is_eval=True, device=device)
@@ -266,15 +266,15 @@ predictor.set_image(np.array(pil_img))
 # text = 'an animal in the center'
 # blip_output = blip_output[0].split('-')[0]
 
-#text = ["kelp"]
+#text = ["background"]
 with torch.no_grad():
     # CLIP architecture surgery acts on the image encoder
     image_features = model.encode_image(image)
     image_features = image_features / image_features.norm(dim=1, keepdim=True)
 
     # Extract redundant features from an empty string
-    redundant_features = clip.encode_text_with_prompt_ensemble(model, [""], device)
-
+    redundant_features = clip.encode_text_with_prompt_ensemble(model, ["background"], device)
+    
     # Prompt ensemble for text features with normalization
     text_features = clip.encode_text_with_prompt_ensemble(model, text, device)
 
@@ -284,12 +284,12 @@ with torch.no_grad():
     sm_mean = sm_norm.mean(-1, keepdim=True)
 
     # get positive points from individual maps, and negative points from the mean map
-    p, l, vis_map  = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.95)
+    p, l, vis_map  = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.0)
     num = len(p) // 2
     points = p[num:] # negatives in the second half
     labels = [l[num:]]
     for i in range(sm.shape[-1]):
-        p, l, vis = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.95)
+        p, l, vis = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.0)
         num = len(p) // 2
         points = points + p[:num] # positive in first half
         labels.append(l[:num])
@@ -304,13 +304,13 @@ with torch.no_grad():
     # Visualize the results
     vis = cv2_img.copy()
     vis_map = np.tile(vis_map, (3, 1, 1)).transpose(1, 2, 0)
-    vis1 = vis * vis_map
+    vis1 = vis * vis_map * 0.5 + vis * 0.5
     vis1 = cv2.cvtColor(vis1.astype('uint8'), cv2.COLOR_BGR2RGB)
     #import pdb
     #pdb.set_trace()
     #plt.imshow(vis1)
     plt.show()
-    plt.savefig("./11_map.jpg")
+    plt.imsave("./2_map.jpg", vis1)
     # vis[mask > 0] = vis[mask > 0] // 2 + np.array([153, 255, 255], dtype=np.uint8) // 2
     vis[mask > 0] = np.array([255, 255, 255], dtype=np.uint8)
     vis[mask == 0] = np.array([0, 0, 0], dtype=np.uint8)
@@ -320,4 +320,4 @@ with torch.no_grad():
     print('SAM & CLIP Surgery for texts combination:', text)
     plt.imshow(vis)
     plt.show()
-    plt.savefig("./11_sam.jpg")
+    plt.imsave("./2_sam1.jpg", vis)
