@@ -266,7 +266,7 @@ predictor.set_image(np.array(pil_img))
 # text = 'an animal in the center'
 # blip_output = blip_output[0].split('-')[0]
 
-#text = ["background"]
+text1 = ["background"]
 with torch.no_grad():
     # CLIP architecture surgery acts on the image encoder
     image_features = model.encode_image(image)
@@ -274,17 +274,21 @@ with torch.no_grad():
 
     # Extract redundant features from an empty string
     redundant_features = clip.encode_text_with_prompt_ensemble(model, ["background"], device)
-    
+    redundant_features1 = clip.encode_text_with_prompt_ensemble(model, [""], device)
     # Prompt ensemble for text features with normalization
     text_features = clip.encode_text_with_prompt_ensemble(model, text, device)
-
+    text_features1 = clip.encode_text_with_prompt_ensemble(model, text1, device)
     # Combine features after removing redundant features and min-max norm
     sm = clip.clip_feature_surgery(image_features, text_features, redundant_features)[0, 1:, :]
     sm_norm = (sm - sm.min(0, keepdim=True)[0]) / (sm.max(0, keepdim=True)[0] - sm.min(0, keepdim=True)[0])
     sm_mean = sm_norm.mean(-1, keepdim=True)
-
+    
+    sm1 = clip.clip_feature_surgery(image_features, text_features1, redundant_features1)[0, 1:, :]
+    sm_norm1 = (sm1 - sm1.min(0, keepdim=True)[0]) / (sm1.max(0, keepdim=True)[0] - sm1.min(0, keepdim=True)[0])
+    sm_mean1 = sm_norm1.mean(-1, keepdim=True)
     # get positive points from individual maps, and negative points from the mean map
-    p, l, vis_map, point_max  = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.0)
+    p, l, vis_map, point_max = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.0)
+    p1, l1, vis_map1, point_min = clip.similarity_map_to_points(sm_mean1, cv2_img.shape[:2], cv2_img, t=0.0)
     num = len(p) // 2
     points = p[num:] # negatives in the second half
     labels = [l[num:]]
@@ -294,7 +298,12 @@ with torch.no_grad():
         points = points + p[:num] # positive in first half
         labels.append(l[:num])
     labels = np.concatenate(labels, 0)
-    label_1 = [1]
+    label_1 = [1, 1, 1, 0, 0, 0]
+    print("point_max", point_max)
+    point_max = point_max + point_min
+    #point_max = np.mean(point_max, axis=0, keepdims=True)
+    #point_max = point_max.astype(int)
+    print("point max", point_max)
     # Inference SAM with points from CLIP Surgery
     masks, scores, logits = predictor.predict(point_labels=labels, point_coords=np.array(points), multimask_output=True)
     mask_single, _, _1 = predictor.predict(point_labels=label_1, point_coords=np.array(point_max), multimask_output=False)
@@ -306,9 +315,23 @@ with torch.no_grad():
     mask_single = mask_single[0].astype('uint8')
     #print("mask_single", mask_single.shape, mask_single) 
     # Visualize the results
+    #print("shape", vis_map.shape, vis_map1.shape)
     vis = cv2_img.copy()
-    vis_map = np.tile(vis_map, (3, 1, 1)).transpose(1, 2, 0)
-    vis1 = vis * vis_map * 0.3 + vis * 0.7
+    vis_map = vis_map.reshape(-1)
+    vis_map1 = vis_map1.reshape(-1)
+    vis_map = vis_map - vis_map1
+    vis_map = (vis_map - vis_map.min()) / (vis_map.max() - vis_map.min())
+    vis_final = vis_map.reshape(vis.shape[0], vis.shape[1])
+    vis_n = (vis_final * 255).astype('uint8')
+    vis_final = np.tile(vis_final, (3, 1, 1)).transpose(1, 2, 0)
+    vis_n = cv2.cvtColor(vis_n, cv2.COLOR_GRAY2BGR)
+    vis_n = cv2.cvtColor(vis_n.astype('uint8'), cv2.COLOR_BGR2RGB)
+    plt.imsave("./map_copy.jpg", vis_n)
+    
+    #vis_final = vis_map.reshape(vis.shape[0], vis.shape[1])
+    #vis_map1 = np.tile(vis_map1, (3, 1, 1)).transpose(1, 2, 0)
+    #vis_final = ((vis_map[0] - vis_map1[0]) - min(vis_map[0] - vis_map1[0]))/(max(vis_map[0] - vis_map1[0])-min(vis_map[0] - vis_map1[0]))
+    vis1 = vis * vis_final * 0.3 + vis * 0.7
     vis1 = cv2.cvtColor(vis1.astype('uint8'), cv2.COLOR_BGR2RGB)
     vis2 = vis
     #import pdb
