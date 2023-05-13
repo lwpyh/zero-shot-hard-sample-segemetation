@@ -330,8 +330,8 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=1):
     scale_w = float(shape[1]) / w
     #sm1 = sm.reshape(down_side, down_side)
     num = min((sm >= t).sum(), sm.shape[0] // 2)
-    labels = np.ones(num * 2).astype('uint8')
-    labels[num:] = 0
+    labels = np.ones(num).astype('uint8')
+    #labels[num:] = 0
     points = []
     vis = (sm1.cpu().numpy() * 255).astype('uint8')
     vis1 = sm1.cpu().numpy()
@@ -343,9 +343,11 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=1):
     plt.imsave("./map1.jpg", vis2)
     vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
     vis = cv2_img * 0.4 + vis * 0.6
+    point_max = []
     max_point = rank[-1]
     new_x = min((max_point  % w + 0.5) * scale_w, shape[1] - 1)
     new_y = min((max_point // w + 0.5) * scale_h, shape[0] - 1)
+    point_max.append([int(new_x.item()), int(new_y.item())])
     star = np.array([
     [new_x, new_y - 20],
     [new_x + 5, new_y - 5],
@@ -386,9 +388,9 @@ def similarity_map_to_points(sm, shape, cv2_img, t=0.8, down_sample=1):
         points.append([int(x.item()), int(y.item())])
 
     # negatives
-    for idx in rank[:num]:
-        x = min((idx % w + 0.5) * scale_w, shape[1] - 1)
-        y = min((idx // w + 0.5) * scale_h, shape[0] - 1)
-        points.append([int(x.item()), int(y.item())])
-
-    return points, labels, vis1
+    #for idx in rank[:num]:
+    #    x = min((idx % w + 0.5) * scale_w, shape[1] - 1)
+    #    y = min((idx // w + 0.5) * scale_h, shape[0] - 1)
+    #    points.append([int(x.item()), int(y.item())])
+   
+    return points, labels, vis1, point_max

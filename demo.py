@@ -18,7 +18,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 preprocess =  Compose([Resize((224, 224), interpolation=BICUBIC), ToTensor(),
     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-pil_img = Image.open("11.jpg").convert("RGB")
+pil_img = Image.open("2_map.jpg").convert("RGB")
 # pil_img = preprocess(pil_img).unsqueeze(0).to(device)
 
 model, vis_processors, _ = load_model_and_preprocess(name="blip2_opt", model_type="pretrain_opt6.7b", is_eval=True, device=device)
@@ -284,28 +284,33 @@ with torch.no_grad():
     sm_mean = sm_norm.mean(-1, keepdim=True)
 
     # get positive points from individual maps, and negative points from the mean map
-    p, l, vis_map  = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.0)
+    p, l, vis_map, point_max  = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.0)
     num = len(p) // 2
     points = p[num:] # negatives in the second half
     labels = [l[num:]]
     for i in range(sm.shape[-1]):
-        p, l, vis = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.0)
+        p, l, vis, _ = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2], cv2_img, t=0.0)
         num = len(p) // 2
         points = points + p[:num] # positive in first half
         labels.append(l[:num])
     labels = np.concatenate(labels, 0)
-
+    label_1 = [1]
     # Inference SAM with points from CLIP Surgery
     masks, scores, logits = predictor.predict(point_labels=labels, point_coords=np.array(points), multimask_output=True)
+    mask_single, _, _1 = predictor.predict(point_labels=label_1, point_coords=np.array(point_max), multimask_output=False)
     # import pdb
-    # pdb.set_trace()
+    # pdb.set_trace()i
+    #print("label", labels, label_1)
     mask = masks[np.argmax(scores)]
     mask = mask.astype('uint8')
+    mask_single = mask_single[0].astype('uint8')
+    #print("mask_single", mask_single.shape, mask_single) 
     # Visualize the results
     vis = cv2_img.copy()
     vis_map = np.tile(vis_map, (3, 1, 1)).transpose(1, 2, 0)
-    vis1 = vis * vis_map * 0.5 + vis * 0.5
+    vis1 = vis * vis_map * 0.3 + vis * 0.7
     vis1 = cv2.cvtColor(vis1.astype('uint8'), cv2.COLOR_BGR2RGB)
+    vis2 = vis
     #import pdb
     #pdb.set_trace()
     #plt.imshow(vis1)
@@ -314,10 +319,21 @@ with torch.no_grad():
     # vis[mask > 0] = vis[mask > 0] // 2 + np.array([153, 255, 255], dtype=np.uint8) // 2
     vis[mask > 0] = np.array([255, 255, 255], dtype=np.uint8)
     vis[mask == 0] = np.array([0, 0, 0], dtype=np.uint8)
-    # for i, [x, y] in enumerate(points):
-    #     cv2.circle(vis, (x, y), 3, (0, 102, 255) if labels[i] == 1 else (255, 102, 51), 3)
+    for i, [x, y] in enumerate(points):
+        cv2.circle(vis, (x, y), 3, (0, 102, 255) if labels[i] == 1 else (255, 102, 51), 3)
     vis = cv2.cvtColor(vis.astype('uint8'), cv2.COLOR_BGR2RGB)
     print('SAM & CLIP Surgery for texts combination:', text)
     plt.imshow(vis)
     plt.show()
     plt.imsave("./2_sam1.jpg", vis)
+    
+    vis2[mask_single > 0] = np.array([255, 255, 255], dtype=np.uint8)
+    vis2[mask_single == 0] = np.array([0, 0, 0], dtype=np.uint8)
+    for i, [x, y] in enumerate(point_max):
+        cv2.circle(vis2, (x, y), 3, (0, 102, 255) if label_1[i] == 1 else (255, 102, 51), 3)
+    vis2 = cv2.cvtColor(vis2.astype('uint8'), cv2.COLOR_BGR2RGB)
+    print('SAM & CLIP Surgery for texts combination:', text)
+    plt.imshow(vis2)
+    plt.show()
+    plt.imsave("./2_sam2.jpg", vis2)
+

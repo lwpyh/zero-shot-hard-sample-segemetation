@@ -77,22 +77,22 @@ with torch.no_grad():
     sm_mean = sm_norm.mean(-1, keepdim=True)
 
     # get positive points from individual maps, and negative points from the mean map
-    p, l, r = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.99)
+    p, l, r = clip.similarity_map_to_points(sm_mean, cv2_img.shape[:2], cv2_img, t=0.8)
     num = len(p) // 2
     points = p[num:]  # negatives in the second half
     labels = [l[num:]]
     for i in range(sm.shape[-1]):
-        p, l, r = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2],cv2_img,  t=0.99)
+        p, l, r = clip.similarity_map_to_points(sm[:, i], cv2_img.shape[:2],cv2_img,  t=0.8)
         num = len(p) // 2
         points = points + p[:num]  # positive in first half
         labels.append(l[:num])
     labels = np.concatenate(labels, 0)
-
+    print("label", labels)
     # Inference SAM with points from CLIP Surgery
     masks, scores, logits = predictor.predict(point_labels=labels, point_coords=np.array(points), multimask_output=True)
     mask = masks[np.argmax(scores)]
     mask = mask.astype('uint8')
-
+    print(masks.shape)
     # Visualize the results
     vis = cv2_img.copy()
     vis[mask > 0] = vis[mask > 0] * 0.2 + np.array([153, 255, 255], dtype=np.uint8) * 0.8
